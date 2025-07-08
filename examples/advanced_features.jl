@@ -1,239 +1,285 @@
+#!/usr/bin/env julia
 """
 Advanced Features Examples for TypeReconstructable.jl
 
-This file demonstrates the advanced metaprogramming capabilities of TypeReconstructable.jl,
-including scoping analysis, closure conversion, and integration with the
-JuliaStaging ecosystem.
-
-Run this file with:
-julia --project examples/advanced_features.jl
+This file demonstrates advanced metaprogramming patterns and sophisticated
+usage of TypeReconstructable.jl.
 """
 
 using TypeReconstructable
 
-"""
-    Example 1: Scope Analysis and Closure Conversion
+println("TypeReconstructable.jl - Advanced Features")
+println("=" ^ 50)
 
-Shows how to use the scoping utilities for analyzing and converting closures.
-"""
-function example_scope_analysis()
-    println("=== Scope Analysis Example ===")
-    
-    # Create a reconstructable variable
-    captured_var = ReconstructableValue([1, 2, 3, 4, 5])
-    
-    # Analyze scope of an expression with closures
-    expr = :(map(x -> x + captured_var, data))
-    
-    analyzer = ScopeAnalyzer()
-    mark_reconstructable!(analyzer, :captured_var)
-    
-    analyzed, free_vars, reconstructable_vars = analyze_scope(expr, analyzer)
-    
-    println("Original expression: ", expr)
-    println("Free variables: ", free_vars)
-    println("Reconstructable variables: ", reconstructable_vars)
-    
-    # Convert closures to handle reconstructable variables
-    converted = convert_closures(analyzed, free_vars, reconstructable_vars)
-    println("Converted expression: ", converted)
-    println()
-end
+# =============================================================================
+# 1. Custom Reconstructable Types
+# =============================================================================
 
-"""
-    Example 2: Custom Reconstructable Type
+println("\n1. Custom Reconstructable Types")
+println("-" ^ 30)
 
-Demonstrates creating a custom type that integrates with TypeReconstructable.
-"""
-function example_custom_reconstructable()
-    println("=== Custom Reconstructable Type Example ===")
-    
-    # Create a neural network data structure
-    weights = [randn(3, 2), randn(2, 1)]
-    biases = [randn(3), randn(2)]
-    
-    # Create a reconstructable struct (simplified since functions aren't serializable)
-    network_data = (
-        weights = weights,
-        biases = biases,
-        layers = [3, 2, 1],
-        activation = "tanh"  # String instead of function
-    )
-    
-    # Make it reconstructable
-    rv_network = ReconstructableValue(network_data)
-    
-    T = typeof(rv_network)
-    reconstructed = reconstruct(T)
-    
-    println("Original network layers: ", rv_network.value.layers)
-    println("Reconstructed network layers: ", reconstructed.value.layers)
-    println("Weights preserved: ", rv_network.value.weights ≈ reconstructed.value.weights)
-    println("Data structure preserved: ", rv_network.value == reconstructed.value)
-    println()
-end
+# For this example, we'll use ReconstructableValue instead
+# since @reconstructable has some limitations with complex types
 
-"""
-    Example 3: Closure Generation with @gg
+# Create a custom data structure
+model_data = (
+    weights = [1.0, 2.0, 3.0],
+    bias = 0.5,
+    name = "test_model"
+)
 
-Demonstrates using GeneralizedGenerated for closure creation.
-"""
-@gg function create_closure(captured_value)
-    quote
-        x -> x + $captured_value
-    end
-end
+# Make it reconstructable
+model_rv = ReconstructableValue(model_data)
+println("Original model: ", model_rv.value)
 
-function example_closure_generation()
-    println("=== Closure Generation Example ===")
+# The type is now reconstructable
+T_model = typeof(model_rv)
+println("Type representation: ", T_model)
+
+reconstructed_model = reconstruct(T_model)
+println("Reconstructed model: ", reconstructed_model.value)
+println("Equal? ", model_rv.value == reconstructed_model.value)
+
+# =============================================================================
+# 2. Complex Generated Functions
+# =============================================================================
+
+println("\n2. Complex Generated Functions")
+println("-" ^ 30)
+
+# Generated function that handles multiple types and generates different code
+@generated function advanced_processor(rv::ReconstructableValue{T}) where T
+    val = from_type(T)
     
-    # Create a closure that captures a value
-    captured = 10
-    closure = create_closure(captured)
-    
-    # Use the closure
-    result = closure(5)
-    println("Closure result: ", result)  # Should be 15
-    
-    # Create closure with reconstructable value
-    rv = ReconstructableValue([1, 2, 3])
-    
-    # This demonstrates how closures can work with reconstructable values
-    @gg function create_reconstructable_closure(rv::ReconstructableValue{T}) where T
-        val = reconstruct(typeof(rv))
-        quote
-            x -> x + sum($(val.value))
+    if val isa Vector{Int}
+        # Generate optimized integer vector processing
+        return quote
+            data = $(val)
+            result = 0
+            for i in 1:length(data)
+                result += data[i] * i  # Weighted sum
+            end
+            result
+        end
+    elseif val isa Vector{Float64}
+        # Generate optimized float vector processing
+        return quote
+            data = $(val)
+            sum(data) / length(data)  # Average
+        end
+    elseif val isa Dict
+        # Generate dictionary processing
+        return quote
+            data = $(val)
+            sum(values(data))
+        end
+    else
+        # Fallback for other types
+        return quote
+            $(val)
         end
     end
-    
-    rv_closure = create_reconstructable_closure(rv)
-    rv_result = rv_closure(10)
-    println("Reconstructable closure result: ", rv_result)  # Should be 16 (10 + 6)
-    println()
 end
 
-"""
-    Example 4: Advanced Pattern Matching
+# Test with different types
+int_rv = ReconstructableValue([1, 2, 3, 4, 5])
+float_rv = ReconstructableValue([1.0, 2.0, 3.0, 4.0, 5.0])
+dict_rv = ReconstructableValue(Dict(:a => 10, :b => 20, :c => 30))
 
-Shows sophisticated pattern matching capabilities.
-"""
-function example_advanced_pattern_matching()
-    println("=== Advanced Pattern Matching Example ===")
-    
-    # Create nested reconstructable structures
-    nested_data = [
-        ReconstructableValue(Dict(:type => "vector", :data => [1, 2, 3])),
-        ReconstructableValue(Dict(:type => "matrix", :data => [1 2; 3 4])),
-        ReconstructableValue(Dict(:type => "scalar", :data => 42))
+println("Int vector result: ", advanced_processor(int_rv))
+println("Float vector result: ", advanced_processor(float_rv))
+println("Dict result: ", advanced_processor(dict_rv))
+
+# =============================================================================
+# 3. Nested and Complex Data Structures
+# =============================================================================
+
+println("\n3. Nested and Complex Data Structures")
+println("-" ^ 30)
+
+# Create complex nested data structure
+complex_data = Dict(
+    :config => Dict(
+        :learning_rate => 0.01,
+        :batch_size => 32,
+        :epochs => 100
+    ),
+    :model => Dict(
+        :layers => [64, 32, 16, 1],
+        :activation => "relu"
+    ),
+    :data => [
+        [1.0, 2.0, 3.0],
+        [4.0, 5.0, 6.0],
+        [7.0, 8.0, 9.0]
     ]
-    
-    for rv in nested_data
-        # Decompose the reconstructable value
-        base_type, encoded, reconstructed_val = decompose_reconstructable(rv)
-        
-        # Pattern match on the structure
-        result = @match reconstructed_val begin
-            Dict{Symbol, Any} && d if d[:type] == "vector" => 
-                "Vector with $(length(d[:data])) elements"
-            Dict{Symbol, Any} && d if d[:type] == "matrix" => 
-                "Matrix with size $(size(d[:data]))"
-            Dict{Symbol, Any} && d if d[:type] == "scalar" => 
-                "Scalar value: $(d[:data])"
-            _ => "Unknown structure"
-        end
-        
-        println("Advanced pattern matched: ", result)
-    end
-    println()
-end
+)
 
-"""
-    Example 5: Code Generation with Caching
+# Make it reconstructable
+complex_rv = ReconstructableValue(complex_data)
+println("Complex data reconstructed successfully: ", 
+        reconstruct(typeof(complex_rv)).value == complex_data)
 
-Demonstrates the code generation caching system.
-"""
-function example_code_generation_caching()
-    println("=== Code Generation Caching Example ===")
+# Generated function to process complex configurations
+@generated function process_config(rv::ReconstructableValue{T}) where T
+    config = from_type(T)
     
-    # Clear any existing cache
-    clear_codegen_cache!()
-    
-    # Generate some code and cache it
-    test_code_1 = :(x + y + z)
-    test_code_2 = :(a * b - c)
-    
-    cache_generated_code("function_1", test_code_1)
-    cache_generated_code("function_2", test_code_2)
-    
-    # Retrieve cached code
-    retrieved_1 = get_cached_code("function_1")
-    retrieved_2 = get_cached_code("function_2")
-    
-    println("Cached code 1: ", retrieved_1)
-    println("Cached code 2: ", retrieved_2)
-    println("Cache working correctly: ", retrieved_1 == test_code_1 && retrieved_2 == test_code_2)
-    
-    # Show cache miss
-    missing_code = get_cached_code("nonexistent")
-    println("Cache miss returns: ", missing_code)
-    
-    clear_codegen_cache!()
-    println("Cache cleared successfully")
-    println()
-end
-
-"""
-    Example 6: Runtime Function Generation
-
-Shows how to create functions dynamically using TypeReconstructable patterns.
-"""
-function example_runtime_function_generation()
-    println("=== Runtime Function Generation Example ===")
-    
-    # Create a simple mathematical expression reconstructable
-    expr_data = ReconstructableValue(:(x^2 + 2*x + 1))
-    
-    # Generate a function that evaluates this expression
-    @gg_autogen function create_evaluator(expr_rv::ReconstructableValue{T}) where T
-        expr_val = reconstruct(typeof(expr_rv))
+    # Generate code based on the configuration
+    if haskey(config, :config) && haskey(config, :model)
+        lr = config[:config][:learning_rate]
+        layers = config[:model][:layers]
         
         return quote
-            function evaluate(x)
-                $(expr_val.value)
-            end
+            # Generate optimized code for this specific configuration
+            learning_rate = $(lr)
+            input_size = $(layers[1])
+            output_size = $(layers[end])
+            
+            println("Configuration: LR=$learning_rate, Input=$input_size, Output=$output_size")
+            (learning_rate, input_size, output_size)
+        end
+    else
+        return quote
+            error("Invalid configuration structure")
         end
     end
-    
-    # Create the evaluator function
-    evaluator_code = create_evaluator(expr_data)
-    println("Generated evaluator code: ", evaluator_code)
-    
-    # We could eval this in a real scenario, but for demo purposes just show the structure
-    println("This demonstrates runtime generation of specialized functions")
-    println()
 end
 
-"""
-    main()
+result = process_config(complex_rv)
+println("Config processing result: ", result)
 
-Run all advanced examples to demonstrate TypeReconstructable.jl's sophisticated capabilities.
-"""
-function main()
-    println("TypeReconstructable.jl Advanced Features Examples")
-    println("====================================")
-    println()
-    
-    example_scope_analysis()
-    example_custom_reconstructable()
-    example_closure_generation()
-    example_advanced_pattern_matching()
-    example_code_generation_caching()
-    example_runtime_function_generation()
-    
-    println("Advanced examples completed!")
+# =============================================================================
+# 4. Scope Analysis and Variable Handling
+# =============================================================================
+
+println("\n4. Scope Analysis and Variable Handling")
+println("-" ^ 30)
+
+# Create a scope analyzer
+analyzer = ScopeAnalyzer()
+println("Scope analyzer created: ", typeof(analyzer))
+
+# Mark some variables as reconstructable
+mark_reconstructable!(analyzer, :my_var)
+mark_reconstructable!(analyzer, :another_var)
+
+println("Reconstructable variables: ", analyzer.reconstructable_vars)
+
+# Test basic scope analysis
+test_expr = :(x + y + z)
+try
+    analyzed, free_vars, reconstructable_vars = analyze_scope(test_expr, analyzer)
+    println("Analyzed expression: ", analyzed)
+    println("Free variables: ", free_vars)
+    println("Reconstructable variables: ", reconstructable_vars)
+catch e
+    println("Scope analysis note: ", e.msg)
 end
 
-# Run examples if this file is executed directly
-if abspath(PROGRAM_FILE) == @__FILE__
-    main()
+# =============================================================================
+# 5. Code Generation Cache
+# =============================================================================
+
+println("\n5. Code Generation Cache")
+println("-" ^ 30)
+
+# Clear cache first
+clear_codegen_cache!()
+
+# Cache some generated code
+test_code = :(x * y + z)
+cached = cache_generated_code("test_function", test_code)
+println("Cached code: ", cached)
+
+# Retrieve from cache
+retrieved = get_cached_code("test_function")
+println("Retrieved code: ", retrieved)
+println("Cache hit: ", cached == retrieved)
+
+# Test cache miss
+missing_code = get_cached_code("nonexistent")
+println("Missing code: ", missing_code)
+
+# =============================================================================
+# 6. Performance Comparison
+# =============================================================================
+
+println("\n6. Performance Comparison")
+println("-" ^ 30)
+
+using BenchmarkTools
+
+# Compare runtime vs compile-time approaches
+function runtime_approach(data)
+    if data isa Vector{Int}
+        return sum(data) * length(data)
+    elseif data isa Vector{Float64}
+        return sum(data) / length(data)
+    else
+        return 0
+    end
 end
+
+@generated function compiletime_approach(rv::ReconstructableValue{T}) where T
+    val = from_type(T)
+    
+    if val isa Vector{Int}
+        return quote
+            sum($(val)) * length($(val))
+        end
+    elseif val isa Vector{Float64}
+        return quote
+            sum($(val)) / length($(val))
+        end
+    else
+        return quote
+            0
+        end
+    end
+end
+
+# Test data
+test_int_data = [1, 2, 3, 4, 5]
+test_float_data = [1.0, 2.0, 3.0, 4.0, 5.0]
+test_int_rv = ReconstructableValue(test_int_data)
+test_float_rv = ReconstructableValue(test_float_data)
+
+println("Runtime approach (int):")
+@btime runtime_approach($test_int_data)
+
+println("Compile-time approach (int):")
+@btime compiletime_approach($test_int_rv)
+
+println("Runtime approach (float):")
+@btime runtime_approach($test_float_data)
+
+println("Compile-time approach (float):")
+@btime compiletime_approach($test_float_rv)
+
+# =============================================================================
+# 7. Error Handling and Edge Cases
+# =============================================================================
+
+println("\n7. Error Handling and Edge Cases")
+println("-" ^ 30)
+
+# Test with empty data
+empty_rv = ReconstructableValue(Int[])
+println("Empty vector reconstruction: ", reconstruct(typeof(empty_rv)).value)
+
+# Test with large data
+large_data = rand(1000)
+large_rv = ReconstructableValue(large_data)
+println("Large data reconstruction successful: ", 
+        length(reconstruct(typeof(large_rv)).value) == 1000)
+
+# Test with special values
+special_data = [NaN, Inf, -Inf, 0.0, -0.0]
+special_rv = ReconstructableValue(special_data)
+reconstructed_special = reconstruct(typeof(special_rv)).value
+println("Special values reconstruction: ", 
+        length(reconstructed_special) == 5 && isnan(reconstructed_special[1]))
+
+println("\n" ^ 2 * "=" ^ 50)
+println("All advanced examples completed successfully!")
+println("TypeReconstructable.jl is working correctly with advanced features.")

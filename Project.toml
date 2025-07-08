@@ -4,22 +4,27 @@ authors = ["Chad Scherrer <chad.scherrer@gmail.com> and contributors"]
 version = "1.0.0-DEV"
 
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 GeneralizedGenerated = "6b9d7cbe-bcb9-11e9-073f-15a7a543e2eb"
 JuliaVariables = "b14d175d-62b4-44ba-8fb7-3064adc8c3ec"
 MLStyle = "d8e11817-5142-5d16-987a-aa16d5891078"
 NameResolution = "71a1bf82-56d0-4bbc-8a3c-48b961074391"
+RuntimeGeneratedFunctions = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 
 [compat]
+BenchmarkTools = "1.6.0"
 GeneralizedGenerated = "0.3"
 JuliaVariables = "0.2"
 MLStyle = "0.4"
 NameResolution = "0.1"
+RuntimeGeneratedFunctions = "0.5"
 Serialization = "1"
 julia = "1.11"
 
 [extras]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "BenchmarkTools"]

@@ -1,172 +1,162 @@
+#!/usr/bin/env julia
 """
 Basic Usage Examples for TypeReconstructable.jl
 
-This file demonstrates the core functionality of TypeReconstructable.jl for type-level
-programming and code generation.
-
-Run this file with:
-julia --project examples/basic_usage.jl
+This file demonstrates the core functionality of TypeReconstructable.jl
+with simple, working examples.
 """
 
 using TypeReconstructable
 
-"""
-    Example 1: Basic Reconstructable Values
+println("TypeReconstructable.jl - Basic Usage Examples")
+println("=" ^ 50)
 
-Demonstrates the core functionality of type-level value reconstruction.
-"""
-function example_basic_reconstructable()
-    println("=== Basic Reconstructable Example ===")
-    
-    # Create a reconstructable value
-    rv = ReconstructableValue([1, 2, 3, 4, 5])
-    println("Original value: ", rv.value)
-    
-    # Get the type representation
-    T = typeof(rv)
-    println("Type representation: ", T)
-    
-    # Reconstruct from type
-    reconstructed = reconstruct(T)
-    println("Reconstructed value: ", reconstructed.value)
-    
-    # Verify they're equal
-    println("Values equal: ", rv.value == reconstructed.value)
-    println()
-end
+# =============================================================================
+# 1. Type-Level Encoding
+# =============================================================================
 
-"""
-    Example 2: Generated Functions with Reconstruction
+println("\n1. Type-Level Encoding")
+println("-" ^ 30)
 
-Shows how to use @gg_autogen for generated functions that work with Reconstructable types.
-"""
-@gg_autogen function compute_on_reconstructable(x::ReconstructableValue{T}) where T
-    # Reconstruct the value at compile time
-    val = reconstruct(typeof(x))
+# Encode a value as a type
+data = [1, 2, 3, 4, 5]
+T = to_type(data)
+println("Original data: ", data)
+println("Type: ", T)
+
+# Decode the type back to a value
+reconstructed = from_type(T)
+println("Reconstructed: ", reconstructed)
+println("Equal? ", data == reconstructed)
+
+# Using the macro form
+T_macro = @to_type [10, 20, 30]
+macro_result = from_type(T_macro)
+println("Macro result: ", macro_result)
+
+# =============================================================================
+# 2. Reconstructable Values
+# =============================================================================
+
+println("\n2. Reconstructable Values")
+println("-" ^ 30)
+
+# Create a reconstructable value
+rv = ReconstructableValue([1, 2, 3, 4, 5])
+println("ReconstructableValue: ", rv)
+println("Type: ", typeof(rv))
+
+# Reconstruct from the type
+reconstructed_rv = reconstruct(typeof(rv))
+println("Reconstructed value: ", reconstructed_rv.value)
+println("Equal? ", rv.value == reconstructed_rv.value)
+
+# Test with different types
+string_rv = ReconstructableValue("Hello, World!")
+string_reconstructed = reconstruct(typeof(string_rv))
+println("String reconstruction: ", string_reconstructed.value)
+
+# =============================================================================
+# 3. Generated Functions
+# =============================================================================
+
+println("\n3. Generated Functions")
+println("-" ^ 30)
+
+# Simple generated function using TypeReconstructable
+@generated function process_data(rv::ReconstructableValue{T}) where T
+    # This happens at compile time
+    val = from_type(T)
     
-    # Generate different code based on the type
-    if val.value isa Vector
+    if val isa Vector{Int}
         return quote
-            sum($(val.value)) + length($(val.value))
-        end
-    elseif val.value isa Dict
-        return quote
-            length($(val.value))
+            # Generate optimized code for integer vectors
+            sum($(val)) + length($(val))
         end
     else
         return quote
-            $(val.value)
+            # Generate code for other types
+            $(val)
         end
     end
 end
 
-function example_generated_functions()
-    println("=== Generated Functions Example ===")
-    
-    # Create different types of reconstructable values
-    vector_rv = ReconstructableValue([10, 20, 30])
-    dict_rv = ReconstructableValue(Dict(:a => 1, :b => 2, :c => 3))
-    scalar_rv = ReconstructableValue(42)
-    
-    # The generated function produces different code for each type
-    println("Vector result: ", compute_on_reconstructable(vector_rv))
-    println("Dict result: ", compute_on_reconstructable(dict_rv))
-    println("Scalar result: ", compute_on_reconstructable(scalar_rv))
-    println()
-end
+# Test the generated function
+int_rv = ReconstructableValue([1, 2, 3, 4, 5])
+result = process_data(int_rv)
+println("Generated function result: ", result)
 
-"""
-    Example 3: Pattern Matching with Reconstructable Types
+# The generated function is memoized - same type = same generated code
+int_rv2 = ReconstructableValue([1, 2, 3, 4, 5])
+result2 = process_data(int_rv2)
+println("Second call result: ", result2)
 
-Demonstrates MLStyle integration for pattern matching on reconstructable types.
-"""
-function example_pattern_matching()
-    println("=== Pattern Matching Example ===")
-    
-    values = [
-        ReconstructableValue([1, 2, 3]),
-        ReconstructableValue(Dict(:key => "value")),
-        ReconstructableValue("hello world"),
-        ReconstructableValue(42)
-    ]
-    
-    for rv in values
-        result = @match_reconstructable rv begin
-            ReconstructableValue{TypeLevel{Vector{Int}, _}} => "Integer vector with $(length(rv.value)) elements"
-            ReconstructableValue{TypeLevel{Dict{Symbol, String}, _}} => "Symbol-String dictionary"
-            ReconstructableValue{TypeLevel{String, _}} => "String: \"$(rv.value)\""
-            ReconstructableValue{TypeLevel{Int, _}} => "Integer: $(rv.value)"
-            _ => "Unknown type"
-        end
-        println("Pattern matched: ", result)
-    end
-    println()
-end
+# =============================================================================
+# 4. Pattern Matching
+# =============================================================================
 
-"""
-    Example 4: Performance Comparison
+println("\n4. Pattern Matching")
+println("-" ^ 30)
 
-Compares performance between runtime and compile-time approaches.
-"""
-function example_performance_comparison()
-    println("=== Performance Comparison Example ===")
-    
-    # Create test data
-    test_data = ReconstructableValue(randn(1000))
-    
-    # Runtime approach
-    function runtime_process(data)
-        if data isa Vector
-            return sum(abs, data)
-        else
-            return 0.0
-        end
-    end
-    
-    # Compile-time approach using @gg_autogen
-    @gg_autogen function compiletime_process(data::ReconstructableValue{T}) where T
-        val = reconstruct(typeof(data))
-        if val.value isa Vector
-            return quote
-                sum(abs, $(val.value))
-            end
-        else
-            return quote
-                0.0
-            end
-        end
-    end
-    
-    # Time both approaches
-    println("Runtime approach:")
-    @time runtime_result = runtime_process(test_data.value)
-    
-    println("Compile-time approach:")
-    @time compiletime_result = compiletime_process(test_data)
-    
-    println("Results equal: ", runtime_result ≈ compiletime_result)
-    println()
-end
+# Decompose a reconstructable value
+base_type, encoded, reconstructed_val = decompose_reconstructable(rv)
+println("Base type: ", base_type)
+println("Reconstructed value: ", reconstructed_val)
 
-"""
-    main()
+# Test with different types
+dict_rv = ReconstructableValue(Dict(:a => 1, :b => 2))
+dict_base, dict_encoded, dict_val = decompose_reconstructable(dict_rv)
+println("Dict base type: ", dict_base)
+println("Dict value: ", dict_val)
 
-Run all basic examples to demonstrate TypeReconstructable.jl capabilities.
-"""
-function main()
-    println("TypeReconstructable.jl Basic Usage Examples")
-    println("============================================")
-    println()
-    
-    example_basic_reconstructable()
-    example_generated_functions()
-    example_pattern_matching()
-    example_performance_comparison()
-    
-    println("Basic examples completed!")
-end
+# =============================================================================
+# 5. Type Checking
+# =============================================================================
 
-# Run examples if this file is executed directly
-if abspath(PROGRAM_FILE) == @__FILE__
-    main()
-end
+println("\n5. Type Checking")
+println("-" ^ 30)
+
+# Check if a type is reconstructable
+println("Is Vector{Int} reconstructable? ", can_reconstruct([1, 2, 3]))
+println("Is String reconstructable? ", can_reconstruct("hello"))
+println("Is ReconstructableValue reconstructable? ", is_reconstructable(typeof(rv)))
+
+# Check type equality
+T1 = to_type([1, 2, 3])
+T2 = to_type([1, 2, 3])
+println("Same type for same value? ", T1 == T2)
+
+T3 = to_type([1, 2, 4])
+println("Different type for different value? ", T1 != T3)
+
+# =============================================================================
+# 6. Performance Characteristics
+# =============================================================================
+
+println("\n6. Performance Characteristics")
+println("-" ^ 30)
+
+# Type-level operations are fast
+using BenchmarkTools
+
+small_data = [1, 2, 3]
+small_T = to_type(small_data)
+
+println("Encoding time:")
+@btime to_type($small_data)
+
+println("Decoding time:")
+@btime from_type($small_T)
+
+# Reconstruction is also fast
+small_rv = ReconstructableValue(small_data)
+println("Reconstruction time:")
+@btime reconstruct(typeof($small_rv))
+
+# Generated functions have zero runtime overhead after compilation
+println("Generated function time:")
+@btime process_data($small_rv)
+
+println("\n" ^ 2 * "=" ^ 50)
+println("All basic examples completed successfully!")
+println("Next: Try examples/advanced_features.jl")

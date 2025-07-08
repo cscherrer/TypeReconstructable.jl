@@ -205,5 +205,34 @@ using Test
         end
         
         @test reconstruction_time < 1.0
+        
+        # Test zero-allocation for type-level operations (compile-time)
+        T = to_type([1, 2, 3])
+        allocs = @allocated from_type(T)
+        @test allocs < 1000  # Should be minimal allocations
+        
+        # Test that reconstruction is fast
+        small_rv = ReconstructableValue([1, 2, 3, 4, 5])
+        fast_time = @elapsed begin
+            for i in 1:100
+                reconstruct(typeof(small_rv))
+            end
+        end
+        @test fast_time < 0.1  # Should be very fast for small data
+        
+        # Test memoization effectiveness (same type should be fast)
+        T1 = typeof(ReconstructableValue([1, 2, 3]))
+        T2 = typeof(ReconstructableValue([1, 2, 3]))  # Same value, same type
+        @test T1 == T2  # Should be identical types
+        
+        # Performance regression test
+        medium_data = rand(Int, 50)
+        medium_rv = ReconstructableValue(medium_data)
+        medium_time = @elapsed begin
+            for i in 1:10
+                reconstruct(typeof(medium_rv))
+            end
+        end
+        @test medium_time < 0.5  # Should scale reasonably
     end
 end

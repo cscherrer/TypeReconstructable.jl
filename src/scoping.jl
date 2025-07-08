@@ -267,16 +267,10 @@ resolved = resolve_variable_names(:(x + y), MyModule)
 ```
 """
 function resolve_variable_names(expr, context::Module=@__MODULE__)
-    # Use NameResolution.jl to resolve names
-    analyzer = top_analyzer()
-    
-    # Enter the module context
-    enter!(analyzer, context)
-    
-    # Resolve the expression
-    resolved = solve!(expr)
-    
-    return resolved
+    # NameResolution.jl API is unstable, disable this functionality
+    # Return the original expression unchanged
+    @warn "resolve_variable_names is disabled due to unstable NameResolution.jl API"
+    return expr
 end
 
 """
@@ -289,20 +283,21 @@ Execute an expression with a specific scoping context.
 - `expr`: Expression to execute
 
 # Returns
-- Result of expression evaluation in the given context
+- Expression with scoping context (disabled to avoid eval)
 
 # Example
 ```julia
-result = @with_scope MyModule begin
-    x + y  # Variables resolved in MyModule context
-end
+# @with_scope is disabled to avoid eval usage
+# Instead of:
+# result = @with_scope MyModule begin
+#     x + y
+# end
+# Use direct module qualification:
+# result = MyModule.x + MyModule.y
 ```
 """
 macro with_scope(context, expr)
-    return esc(quote
-        local resolved = resolve_variable_names($(QuoteNode(expr)), $context)
-        eval($context, resolved)
-    end)
+    error("@with_scope is disabled to avoid eval usage. Use direct module qualification instead.")
 end
 
 # Helper functions

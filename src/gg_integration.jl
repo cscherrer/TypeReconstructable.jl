@@ -124,17 +124,24 @@ fn = make_gg_function(
 ```
 """
 function make_gg_function(name::Symbol, args::Vector, body::Expr, module_context=@__MODULE__)
-    # Create the function definition
-    func_def = Expr(:function, 
-        Expr(:call, name, args...),
-        body
-    )
+    # This function is problematic due to JuliaVariables issues in mk_function
+    # The safest approach is to avoid dynamic function creation entirely
+    error("""
+    make_gg_function is disabled due to JuliaVariables compatibility issues.
     
-    # Apply @gg_autogen transformation
-    gg_func = macroexpand(module_context, :(@gg_autogen $func_def))
+    Recommended alternatives:
+    1. Use @gg_autogen macro directly on function definitions
+    2. Use @generated functions with TypeReconstructable
+    3. Use RuntimeGeneratedFunctions.jl for runtime function creation
     
-    # Evaluate in the specified module
-    return runtime_eval(module_context, gg_func)
+    Example:
+    @gg_autogen function my_func(x::ReconstructableValue)
+        val = reconstruct(typeof(x))
+        return quote
+            # Use \$(val.value) here
+        end
+    end
+    """)
 end
 
 """

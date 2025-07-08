@@ -93,7 +93,7 @@ function from_type(::Type{TypeLevel{T,Buf}}) where {T,Buf}
     end
     
     # Convert tuple back to buffer
-    buffer = collect(UInt8, Buf)
+    buffer = UInt8[x for x in Buf]
     
     # Check for empty buffer
     if isempty(buffer)

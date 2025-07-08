@@ -8,6 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `julia --project test/runtests.jl` - Run all tests
 - `julia --project -e "using Pkg; Pkg.test()"` - Run tests via Pkg manager
 
+### Benchmarking
+- `julia --project bench/runbenchmarks.jl` - Run comprehensive benchmark suite
+- `julia --project bench/regression_test.jl` - Run regression test against baseline
+- `julia --project bench/regression_test.jl baseline` - Create new performance baseline
+
 ### Package Management
 - `julia --project -e "using Pkg; Pkg.instantiate()"` - Install dependencies
 - `julia --project -e "using Pkg; Pkg.build()"` - Build the package
