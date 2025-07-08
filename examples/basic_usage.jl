@@ -1,67 +1,22 @@
-#!/usr/bin/env julia
 """
 Basic Usage Examples for TypeReconstructable.jl
 
 This file demonstrates the core functionality of TypeReconstructable.jl
-with simple, working examples.
+with simple, working examples. Run from REPL with:
+
+julia> include("examples/basic_usage.jl")
+julia> demo_basic_usage()
 """
 
 using TypeReconstructable
 
-println("TypeReconstructable.jl - Basic Usage Examples")
-println("=" ^ 50)
-
-# =============================================================================
-# 1. Type-Level Encoding
-# =============================================================================
-
-println("\n1. Type-Level Encoding")
-println("-" ^ 30)
-
-# Encode a value as a type
-data = [1, 2, 3, 4, 5]
-T = to_type(data)
-println("Original data: ", data)
-println("Type: ", T)
-
-# Decode the type back to a value
-reconstructed = from_type(T)
-println("Reconstructed: ", reconstructed)
-println("Equal? ", data == reconstructed)
-
-# Using the macro form
-T_macro = @to_type [10, 20, 30]
-macro_result = from_type(T_macro)
-println("Macro result: ", macro_result)
-
-# =============================================================================
-# 2. Reconstructable Values
-# =============================================================================
-
-println("\n2. Reconstructable Values")
-println("-" ^ 30)
-
-# Create a reconstructable value
-rv = ReconstructableValue([1, 2, 3, 4, 5])
-println("ReconstructableValue: ", rv)
-println("Type: ", typeof(rv))
-
-# Reconstruct from the type
-reconstructed_rv = reconstruct(typeof(rv))
-println("Reconstructed value: ", reconstructed_rv.value)
-println("Equal? ", rv.value == reconstructed_rv.value)
-
-# Test with different types
-string_rv = ReconstructableValue("Hello, World!")
-string_reconstructed = reconstruct(typeof(string_rv))
-println("String reconstruction: ", string_reconstructed.value)
-
-# =============================================================================
-# 3. Generated Functions
-# =============================================================================
-
-println("\n3. Generated Functions")
-println("-" ^ 30)
+# Try to load BenchmarkTools, but don't fail if it's not available
+const HAS_BENCHMARKTOOLS = try
+    using BenchmarkTools
+    true
+catch
+    false
+end
 
 # Simple generated function using TypeReconstructable
 @generated function process_data(rv::ReconstructableValue{T}) where T
@@ -81,82 +36,152 @@ println("-" ^ 30)
     end
 end
 
-# Test the generated function
-int_rv = ReconstructableValue([1, 2, 3, 4, 5])
-result = process_data(int_rv)
-println("Generated function result: ", result)
+function demo_basic_usage()
+    """
+    Comprehensive demonstration of TypeReconstructable.jl basic features.
+    """
+    
+    println("TypeReconstructable.jl - Basic Usage Examples")
+    println("=" ^ 50)
 
-# The generated function is memoized - same type = same generated code
-int_rv2 = ReconstructableValue([1, 2, 3, 4, 5])
-result2 = process_data(int_rv2)
-println("Second call result: ", result2)
+    # =============================================================================
+    # 1. Type-Level Encoding
+    # =============================================================================
 
-# =============================================================================
-# 4. Pattern Matching
-# =============================================================================
+    println("\n1. Type-Level Encoding")
+    println("-" ^ 30)
 
-println("\n4. Pattern Matching")
-println("-" ^ 30)
+    # Encode a value as a type
+    data = [1, 2, 3, 4, 5]
+    T = to_type(data)
+    println("Original data: ", data)
+    println("Type: ", T)
 
-# Decompose a reconstructable value
-base_type, encoded, reconstructed_val = decompose_reconstructable(rv)
-println("Base type: ", base_type)
-println("Reconstructed value: ", reconstructed_val)
+    # Decode the type back to a value
+    reconstructed = from_type(T)
+    println("Reconstructed: ", reconstructed)
+    println("Equal? ", data == reconstructed)
 
-# Test with different types
-dict_rv = ReconstructableValue(Dict(:a => 1, :b => 2))
-dict_base, dict_encoded, dict_val = decompose_reconstructable(dict_rv)
-println("Dict base type: ", dict_base)
-println("Dict value: ", dict_val)
+    # Using the macro form
+    T_macro = @to_type [10, 20, 30]
+    macro_result = from_type(T_macro)
+    println("Macro result: ", macro_result)
 
-# =============================================================================
-# 5. Type Checking
-# =============================================================================
+    # =============================================================================
+    # 2. Reconstructable Values
+    # =============================================================================
 
-println("\n5. Type Checking")
-println("-" ^ 30)
+    println("\n2. Reconstructable Values")
+    println("-" ^ 30)
 
-# Check if a type is reconstructable
-println("Is Vector{Int} reconstructable? ", can_reconstruct([1, 2, 3]))
-println("Is String reconstructable? ", can_reconstruct("hello"))
-println("Is ReconstructableValue reconstructable? ", is_reconstructable(typeof(rv)))
+    # Create a reconstructable value
+    rv = ReconstructableValue([1, 2, 3, 4, 5])
+    println("ReconstructableValue: ", rv)
+    println("Type: ", typeof(rv))
 
-# Check type equality
-T1 = to_type([1, 2, 3])
-T2 = to_type([1, 2, 3])
-println("Same type for same value? ", T1 == T2)
+    # Reconstruct from the type
+    reconstructed_rv = reconstruct(typeof(rv))
+    println("Reconstructed value: ", reconstructed_rv.value)
+    println("Equal? ", rv.value == reconstructed_rv.value)
 
-T3 = to_type([1, 2, 4])
-println("Different type for different value? ", T1 != T3)
+    # Test with different types
+    string_rv = ReconstructableValue("Hello, World!")
+    string_reconstructed = reconstruct(typeof(string_rv))
+    println("String reconstruction: ", string_reconstructed.value)
 
-# =============================================================================
-# 6. Performance Characteristics
-# =============================================================================
+    # =============================================================================
+    # 3. Generated Functions
+    # =============================================================================
 
-println("\n6. Performance Characteristics")
-println("-" ^ 30)
+    println("\n3. Generated Functions")
+    println("-" ^ 30)
 
-# Type-level operations are fast
-using BenchmarkTools
+    # Test the generated function
+    int_rv = ReconstructableValue([1, 2, 3, 4, 5])
+    result = process_data(int_rv)
+    println("Generated function result: ", result)
 
-small_data = [1, 2, 3]
-small_T = to_type(small_data)
+    # The generated function is memoized - same type = same generated code
+    int_rv2 = ReconstructableValue([1, 2, 3, 4, 5])
+    result2 = process_data(int_rv2)
+    println("Second call result: ", result2)
 
-println("Encoding time:")
-@btime to_type($small_data)
+    # =============================================================================
+    # 4. Pattern Matching
+    # =============================================================================
 
-println("Decoding time:")
-@btime from_type($small_T)
+    println("\n4. Pattern Matching")
+    println("-" ^ 30)
 
-# Reconstruction is also fast
-small_rv = ReconstructableValue(small_data)
-println("Reconstruction time:")
-@btime reconstruct(typeof($small_rv))
+    # Decompose a reconstructable value
+    base_type, encoded, reconstructed_val = decompose_reconstructable(rv)
+    println("Base type: ", base_type)
+    println("Reconstructed value: ", reconstructed_val)
 
-# Generated functions have zero runtime overhead after compilation
-println("Generated function time:")
-@btime process_data($small_rv)
+    # Test with different types
+    dict_rv = ReconstructableValue(Dict(:a => 1, :b => 2))
+    dict_base, dict_encoded, dict_val = decompose_reconstructable(dict_rv)
+    println("Dict base type: ", dict_base)
+    println("Dict value: ", dict_val)
 
-println("\n" ^ 2 * "=" ^ 50)
-println("All basic examples completed successfully!")
-println("Next: Try examples/advanced_features.jl")
+    # =============================================================================
+    # 5. Type Checking
+    # =============================================================================
+
+    println("\n5. Type Checking")
+    println("-" ^ 30)
+
+    # Check if a type is reconstructable
+    println("Is Vector{Int} reconstructable? ", can_reconstruct([1, 2, 3]))
+    println("Is String reconstructable? ", can_reconstruct("hello"))
+    println("Is ReconstructableValue reconstructable? ", is_reconstructable(typeof(rv)))
+
+    # Check type equality
+    T1 = to_type([1, 2, 3])
+    T2 = to_type([1, 2, 3])
+    println("Same type for same value? ", T1 == T2)
+
+    T3 = to_type([1, 2, 4])
+    println("Different type for different value? ", T1 != T3)
+
+    # =============================================================================
+    # 6. Performance Characteristics
+    # =============================================================================
+
+    println("\n6. Performance Characteristics")
+    println("-" ^ 30)
+
+    # Type-level operations are fast
+    small_data = [1, 2, 3]
+    small_T = to_type(small_data)
+    small_rv = ReconstructableValue(small_data)
+    
+    if HAS_BENCHMARKTOOLS
+        println("Encoding time:")
+        @btime to_type($small_data)
+
+        println("Decoding time:")
+        @btime from_type($small_T)
+
+        println("Reconstruction time:")
+        @btime reconstruct(typeof($small_rv))
+
+        println("Generated function time:")
+        @btime process_data($small_rv)
+    else
+        println("BenchmarkTools not available. Install with: using Pkg; Pkg.add(\"BenchmarkTools\")")
+        
+        println("Encoding time (simple):")
+        @time to_type(small_data)
+        
+        println("Generated function result:")
+        println("  Result: ", process_data(small_rv))
+    end
+
+    println("\n" ^ 2 * "=" ^ 50)
+    println("All basic examples completed successfully!")
+    println("Next: Try demo_advanced_features() from examples/advanced_features.jl")
+end
+
+# Run the demo if this file is included directly
+demo_basic_usage()

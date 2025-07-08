@@ -233,6 +233,11 @@ Check if a value can be made reconstructable (i.e., can be serialized).
 - `true` if the value can be made reconstructable, `false` otherwise
 """
 function can_reconstruct(x)
+    # Check for known problematic types first
+    if !is_safe_to_reconstruct(x)
+        return false
+    end
+    
     try
         type_level = to_type(x)
         # Also try to reconstruct to ensure roundtrip works
@@ -243,6 +248,81 @@ function can_reconstruct(x)
         @debug "Cannot reconstruct value of type $(typeof(x)): $e"
         return false
     end
+end
+
+"""
+Check if a value is safe to reconstruct.
+This filters out types that may serialize but shouldn't be reconstructed.
+"""
+function is_safe_to_reconstruct(x)
+    # Check for IO types
+    if isa(x, IO)
+        return false
+    end
+    
+    # Check for Task/coroutines
+    if isa(x, Task)
+        return false
+    end
+    
+    # Check for functions and closures
+    if isa(x, Function)
+        return false
+    end
+    
+    # Check for circular references in containers
+    if isa(x, AbstractDict) || isa(x, AbstractArray) || isa(x, Tuple) || isa(x, NamedTuple)
+        return !has_circular_reference(x)
+    end
+    
+    return true
+end
+
+"""
+Detect circular references in data structures using visited set.
+"""
+function has_circular_reference(x, visited = Set{UInt}())
+    # Use object ID to detect cycles
+    obj_id = objectid(x)
+    if obj_id in visited
+        return true
+    end
+    
+    # Add current object to visited set
+    push!(visited, obj_id)
+    
+    try
+        if isa(x, AbstractDict)
+            for (k, v) in x
+                if has_circular_reference(k, visited) || has_circular_reference(v, visited)
+                    return true
+                end
+            end
+        elseif isa(x, AbstractArray)
+            for item in x
+                if has_circular_reference(item, visited)
+                    return true
+                end
+            end
+        elseif isa(x, Tuple)
+            for item in x
+                if has_circular_reference(item, visited)
+                    return true
+                end
+            end
+        elseif isa(x, NamedTuple)
+            for item in values(x)
+                if has_circular_reference(item, visited)
+                    return true
+                end
+            end
+        end
+    finally
+        # Remove from visited set on exit
+        delete!(visited, obj_id)
+    end
+    
+    return false
 end
 
 # Export public interface

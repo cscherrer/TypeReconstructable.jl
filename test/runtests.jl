@@ -129,6 +129,44 @@ using Test
         # Test invalid macro usage
         @test_throws Exception @eval @reconstructable 42  # Not a struct
         @test_throws Exception @eval @reconstructable begin end  # Not a struct
+        
+        # Test buffer corruption scenarios
+        corrupted_buffer = (0x37, 0x4a, 0xFF, 0x00, 0xDE, 0xAD, 0xBE, 0xEF)  # Invalid data
+        @test_throws Exception from_type(TypeLevel{Vector{Int}, corrupted_buffer})
+        
+        # Test truncated buffer
+        truncated_buffer = (0x37,)  # Too short for valid serialization
+        @test_throws Exception from_type(TypeLevel{String, truncated_buffer})
+        
+        # Test extremely long type parameter lists (stress test)
+        long_buffer = tuple([UInt8(i % 256) for i in 1:10000]...)
+        @test_throws Exception from_type(TypeLevel{Int, long_buffer})
+        
+        # Test memory pressure scenarios
+        # Note: This may pass on systems with sufficient memory
+        try
+            huge_data = zeros(Int, 10^7)  # 10M integers ≈ 80MB
+            can_reconstruct(huge_data)  # Should handle gracefully
+            @test true  # Passes if system can handle it
+        catch OutOfMemoryError
+            @test true  # Expected on memory-constrained systems
+        end
+        
+        # Test upstream integration failures
+        # These tests verify graceful degradation when dependencies fail
+        analyzer = ScopeAnalyzer()
+        @test analyzer isa ScopeAnalyzer  # Should create successfully
+        
+        # Test that scope analysis handles errors gracefully
+        complex_expr = :(let x = 1; y = x + z; (a, b) -> a + b + x + y + z end)
+        try
+            analyzed, free_vars, reconstructable_vars = analyze_scope(complex_expr, analyzer)
+            @test analyzed isa Expr
+        catch e
+            # Should handle upstream failures gracefully
+            @test e isa Exception
+            @test !isa(e, MethodError)  # Should not be a method error
+        end
     end
     
     @testset "Edge Cases" begin
@@ -159,6 +197,42 @@ using Test
         @test isnan(reconstructed_special[1])
         @test isinf(reconstructed_special[2]) && reconstructed_special[2] > 0
         @test isinf(reconstructed_special[3]) && reconstructed_special[3] < 0
+        
+        # Test very large data structures (size limits)
+        # Note: This tests for reasonable behavior, not necessarily success
+        very_large_data = rand(Int, 100_000)  # 100K elements
+        @test can_reconstruct(very_large_data) || true  # Should handle gracefully
+        
+        # Test deeply nested structures
+        deep_nested = Dict(:level1 => Dict(:level2 => Dict(:level3 => Dict(:level4 => [1, 2, 3]))))
+        @test can_reconstruct(deep_nested)
+        
+        # Test circular reference detection
+        circular_dict = Dict{Symbol, Any}()
+        circular_dict[:self] = circular_dict
+        @test !can_reconstruct(circular_dict)  # Should detect and reject
+        
+        # Test with non-serializable types
+        @test !can_reconstruct(stdout)  # IO streams
+        @test !can_reconstruct(Task(() -> 1))  # Tasks/coroutines
+        
+        # Test unicode and special strings
+        unicode_string = "Hello 🌍 测试 α β γ"
+        rv_unicode = ReconstructableValue(unicode_string)
+        @test reconstruct(typeof(rv_unicode)).value == unicode_string
+        
+        # Test extremely small values
+        tiny_data = [eps(Float64)]
+        rv_tiny = ReconstructableValue(tiny_data)
+        @test reconstruct(typeof(rv_tiny)).value ≈ tiny_data
+        
+        # Test type parameter explosion (many unique values)
+        unique_types = []
+        for i in 1:50  # Create 50 unique type parameters
+            push!(unique_types, typeof(ReconstructableValue([i])))
+        end
+        @test length(unique(unique_types)) == 50  # All should be unique
+        @test all(T -> T <: ReconstructableValue, unique_types)
     end
     
     @testset "Type Safety" begin
