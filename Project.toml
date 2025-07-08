@@ -1,9 +1,21 @@
-name = "AutoGen"
+name = "TypeReconstructable"
 uuid = "330ca4ee-aa6c-4451-8119-cff3f569b8e7"
 authors = ["Chad Scherrer <chad.scherrer@gmail.com> and contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+GeneralizedGenerated = "6b9d7cbe-bcb9-11e9-073f-15a7a543e2eb"
+JuliaVariables = "b14d175d-62b4-44ba-8fb7-3064adc8c3ec"
+MLStyle = "d8e11817-5142-5d16-987a-aa16d5891078"
+NameResolution = "71a1bf82-56d0-4bbc-8a3c-48b961074391"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
 [compat]
+GeneralizedGenerated = "0.3"
+JuliaVariables = "0.2"
+MLStyle = "0.4"
+NameResolution = "0.1"
+Serialization = "1"
 julia = "1.11"
 
 [extras]

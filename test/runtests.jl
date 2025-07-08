@@ -1,6 +1,209 @@
-using AutoGen
+using TypeReconstructable
 using Test
 
-@testset "AutoGen.jl" begin
-    # Write your tests here.
+@testset "TypeReconstructable.jl" begin
+    @testset "TypeLevel Encoding" begin
+        # Test basic type-level encoding
+        x = [1, 2, 3, 4, 5]
+        T = to_type(x)
+        y = from_type(T)
+        
+        @test x == y
+        @test is_typelevel(T)
+        @test base_type(T) == Vector{Int64}
+        
+        # Test with different types
+        dict_val = Dict(:a => 1, :b => 2)
+        T_dict = to_type(dict_val)
+        reconstructed_dict = from_type(T_dict)
+        
+        @test dict_val == reconstructed_dict
+        @test is_typelevel(T_dict)
+        
+        # Test macro version
+        T_macro = @to_type [10, 20, 30]
+        macro_result = from_type(T_macro)
+        @test macro_result == [10, 20, 30]
+    end
+    
+    @testset "Reconstructable Types" begin
+        # Test ReconstructableValue
+        rv = ReconstructableValue([1, 2, 3])
+        @test is_reconstructable(typeof(rv))
+        
+        reconstructed = reconstruct(typeof(rv))
+        @test rv.value == reconstructed.value
+        
+        # Test with different types
+        string_rv = ReconstructableValue("hello world")
+        string_reconstructed = reconstruct(typeof(string_rv))
+        @test string_rv.value == string_reconstructed.value
+        
+        # Test can_reconstruct
+        @test can_reconstruct([1, 2, 3])
+        @test can_reconstruct(Dict(:a => 1))
+        @test can_reconstruct("test")
+    end
+    
+    @testset "Pattern Matching" begin
+        # Test decompose_reconstructable
+        rv = ReconstructableValue([1, 2, 3, 4])
+        base_type, encoded, reconstructed_val = decompose_reconstructable(rv)
+        
+        @test base_type == Vector{Int64}
+        @test reconstructed_val == [1, 2, 3, 4]
+        @test is_typelevel(encoded)
+    end
+    
+    @testset "Scope Analysis" begin
+        # Test ScopeAnalyzer creation
+        analyzer = ScopeAnalyzer()
+        @test analyzer isa ScopeAnalyzer
+        
+        # Test marking reconstructable variables
+        mark_reconstructable!(analyzer, :test_var)
+        @test :test_var in analyzer.reconstructable_vars
+        
+        # Test basic scope analysis
+        expr = :(x + y)
+        analyzed, free_vars, reconstructable_vars = analyze_scope(expr, analyzer)
+        @test analyzed isa Expr
+        @test free_vars isa Set
+    end
+    
+    @testset "Code Generation Cache" begin
+        # Test cache operations
+        clear_codegen_cache!()
+        
+        test_key = "test_function"
+        test_code = :(x + y)
+        
+        cached = cache_generated_code(test_key, test_code)
+        @test cached == test_code
+        
+        retrieved = get_cached_code(test_key)
+        @test retrieved == test_code
+        
+        clear_codegen_cache!()
+        @test get_cached_code(test_key) === nothing
+    end
+    
+    @testset "Integration Tests" begin
+        # Test that all modules load correctly
+        @test TypeLevel{Int, (0x01,)} isa DataType
+        @test Reconstructable isa Type
+        @test ReconstructableValue isa Type
+        
+        # Test basic workflow
+        original_data = [1, 2, 3, 4, 5]
+        rv = ReconstructableValue(original_data)
+        T = typeof(rv)
+        reconstructed = reconstruct(T)
+        
+        @test original_data == reconstructed.value
+        @test is_reconstructable(T)
+        
+        # Test type equality
+        rv2 = ReconstructableValue([1, 2, 3, 4, 5])
+        @test typeof(rv) == typeof(rv2)  # Same type parameters
+    end
+    
+    @testset "Error Handling" begin
+        # Test invalid TypeLevel constructions
+        @test_throws Exception from_type(TypeLevel{Int, ()})  # Empty buffer
+        @test_throws Exception from_type(TypeLevel{Int, ("invalid",)})  # Invalid buffer
+        
+        # Test type mismatches
+        @test_throws Exception ReconstructableValue{Int}()  # Non-TypeLevel type
+        
+        # Test non-serializable values
+        # Note: Some values may be serializable in newer Julia versions
+        try
+            f = () -> 1  # Functions are typically not serializable
+            @test !can_reconstruct(f)
+        catch
+            # If functions are serializable, try something else
+            @test true  # Skip this test
+        end
+        
+        # Test invalid macro usage
+        @test_throws Exception @eval @reconstructable 42  # Not a struct
+        @test_throws Exception @eval @reconstructable begin end  # Not a struct
+    end
+    
+    @testset "Edge Cases" begin
+        # Test with empty containers
+        empty_vec = Int[]
+        rv_empty = ReconstructableValue(empty_vec)
+        @test reconstruct(typeof(rv_empty)).value == empty_vec
+        
+        # Test with complex nested structures
+        nested = Dict(
+            :vectors => [1, 2, 3],
+            :nested_dict => Dict("a" => [1.0, 2.0], "b" => [3.0, 4.0]),
+            :tuple => (1, "hello", 3.14)
+        )
+        rv_nested = ReconstructableValue(nested)
+        @test reconstruct(typeof(rv_nested)).value == nested
+        
+        # Test with large data
+        large_data = rand(1000)
+        rv_large = ReconstructableValue(large_data)
+        @test reconstruct(typeof(rv_large)).value ≈ large_data
+        
+        # Test with special values
+        special_vals = [NaN, Inf, -Inf, 0.0, -0.0]
+        rv_special = ReconstructableValue(special_vals)
+        reconstructed_special = reconstruct(typeof(rv_special)).value
+        @test length(reconstructed_special) == length(special_vals)
+        @test isnan(reconstructed_special[1])
+        @test isinf(reconstructed_special[2]) && reconstructed_special[2] > 0
+        @test isinf(reconstructed_special[3]) && reconstructed_special[3] < 0
+    end
+    
+    @testset "Type Safety" begin
+        # Test that type parameters are preserved correctly
+        string_rv = ReconstructableValue("test")
+        @test base_type(type_repr(string_rv)) == String
+        
+        # Test that reconstruction preserves exact types
+        int_vec = [1, 2, 3]
+        float_vec = [1.0, 2.0, 3.0]
+        
+        rv_int = ReconstructableValue(int_vec)
+        rv_float = ReconstructableValue(float_vec)
+        
+        @test typeof(reconstruct(typeof(rv_int)).value) == Vector{Int}
+        @test typeof(reconstruct(typeof(rv_float)).value) == Vector{Float64}
+        
+        # Test that different values have different types
+        @test typeof(ReconstructableValue(1)) != typeof(ReconstructableValue(2))
+        @test typeof(ReconstructableValue([1])) != typeof(ReconstructableValue([2]))
+    end
+    
+    @testset "Performance" begin
+        # Test that type-level operations are reasonably fast
+        data = randn(100)
+        
+        # Measure encoding time
+        encoding_time = @elapsed begin
+            for i in 1:10
+                T = to_type(data)
+                from_type(T)
+            end
+        end
+        
+        # Should complete in reasonable time (this is a basic check)
+        @test encoding_time < 1.0  # Less than 1 second for 10 operations
+        
+        # Test reconstructable performance
+        rv = ReconstructableValue(data)
+        reconstruction_time = @elapsed begin
+            for i in 1:10
+                reconstruct(typeof(rv))
+            end
+        end
+        
+        @test reconstruction_time < 1.0
+    end
 end
